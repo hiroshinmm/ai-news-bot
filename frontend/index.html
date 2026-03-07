@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI News Dashboard</title>
+  <!-- Google Fonts: Roboto and Orbitron for a modern tech feel -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Roboto:wght@300;400;500;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+  <div id="app">
+    <header>
+      <div class="header-content">
+        <h1 class="logo">AI News <span>Dashboard</span></h1>
+        <p id="last-updated" class="subtitle">Last Updated: Loading...</p>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- Error or Loading Message -->
+      <div id="status-message" class="status-message">Fetching latest AI news...</div>
+
+      <!-- content area (hidden initially) -->
+      <div id="news-content" class="fade-in" style="display: none;">
+
+        <!-- Headlines Section -->
+        <section class="headlines-section">
+          <h2 class="section-title"><span class="icon">✨</span> Top Headlines</h2>
+          <div id="headlines-grid" class="grid-container">
+            <!-- Headlines will be inserted here -->
+          </div>
+        </section>
+
+        <!-- Sub News Section -->
+        <section class="subnews-section">
+          <h2 class="section-title"><span class="icon">📰</span> Notable News (Top 10)</h2>
+          <div id="subnews-list" class="list-container">
+            <!-- Sub news will be inserted here -->
+          </div>
+        </section>
+
+        <!-- Other News Section -->
+        <section class="othernews-section" style="margin-top: 60px;">
+          <h2 class="section-title"><span class="icon">🔍</span> All Other News</h2>
+          <div id="othernews-list" class="list-container compact">
+            <!-- Other news will be inserted here -->
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="year"></span> Automated AI News Aggregator by Antigravity</p>
+    </footer>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+
+</html>

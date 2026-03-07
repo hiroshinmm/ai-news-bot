@@ -1,0 +1,29 @@
+name: Daily AI News Collection
+on:
+  schedule:
+    # 毎朝7:00 JSTに実行 (UTCで前日22:00)
+    - cron: '0 22 * * *'
+  # 手動実行用トリガー
+  workflow_dispatch:
+
+jobs:
+  run-daily-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run News Collector Script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+        run: node backend/index_github.js
