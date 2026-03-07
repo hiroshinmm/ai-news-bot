@@ -31,7 +31,7 @@ export async function processNewsWithAI(newsItems) {
 【タスク】
 1. リストの中で最も重要と思われる「ヘッドラインニュース」を3件選び、それぞれ150文字程度で日本語で要約してください。
 2. 次に重要と思われる「次点のニュース」を10件選び、それぞれ50文字程度の簡単な日本語の要約を付けてください。
-3. 選ばれなかった残りのニュースすべてを「その他のニュース」としてください。
+3. 出力には、選んだ計13件のニュースのみを含めてください。「その他のニュース」は出力に含めないでください。
 
 【出力形式】
 以下の構造の有効なJSONのみを出力してください。マークダウンの記法（\`\`\`json など）は含めないでください。
@@ -54,16 +54,7 @@ export async function processNewsWithAI(newsItems) {
       "link": "記事のURL",
       "pubDate": "記事の日時文字列"
     }
-  ],
-  "otherNews": [
-    {
-      "title": "記事のタイトル",
-      "source": "ニュース元の名前",
-      "link": "記事のURL",
-      "pubDate": "記事の日時文字列"
-    }
-  ],
-  "generatedAt": "生成した現在の日時（ISO文字列など）"
+  ]
 }
 
 【ニュース記事リスト】
@@ -80,12 +71,39 @@ ${newsListString}
     });
 
     let responseText = response.text;
-    // マークダウンのコードブロックが含まれている場合は除去
-    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      responseText = jsonMatch[0];
+    }
 
-    const processedData = JSON.parse(responseText);
+    let processedData = {};
+    try {
+      processedData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ Failed to parse JSON from AI response:', parseError);
+      console.log('--- RAW AI RESPONSE ---');
+      console.log(responseText);
+      console.log('-----------------------');
+      return null;
+    }
 
-    // generatedAtを上書きして正確な時間に
+    // 選ばれた記事のURLをセットにまとめる
+    const selectedUrls = new Set([
+      ...(processedData.headlines || []).map(n => n.link),
+      ...(processedData.subNews || []).map(n => n.link)
+    ]);
+
+    // 選ばれなかった残りの記事を otherNews としてスクリプト側で追加する
+    processedData.otherNews = newsItems
+      .filter(n => !selectedUrls.has(n.link))
+      .map(n => ({
+        title: n.title,
+        source: n.source,
+        link: n.link,
+        pubDate: n.pubDate
+      }));
+
+    // generatedAtを付加して正確な時間に
     processedData.generatedAt = new Date().toISOString();
 
     // データの保存ディレクトリの確認と作成
