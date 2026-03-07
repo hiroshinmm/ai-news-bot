@@ -1,4 +1,4 @@
-name: Daily AI News Collection
+name: Daily AI News Collection and Deploy
 on:
   schedule:
     # 毎朝7:00 JSTに実行 (UTCで前日22:00)
@@ -6,15 +6,28 @@ on:
   # 手動実行用トリガー
   workflow_dispatch:
 
+# GitHub Pagesデプロイに必要な権限を付与
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  run-daily-news:
+  run-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -27,3 +40,18 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
         run: node backend/index_github.js
+
+      - name: Build Frontend (Vite)
+        run: npx vite build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

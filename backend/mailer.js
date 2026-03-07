@@ -32,6 +32,9 @@ export async function sendEmailWithNews(newsData) {
     let htmlContent = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 15px;">Daily AI News Summary</h1>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <a href="https://hiroshinmm.github.io/ai-news-bot/" style="background-color: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">🌐 Webサイトで最新ニュースを見る</a>
+        </div>
         <p style="text-align: right; color: #7f8c8d; font-size: 0.9em;">Generated at: ${new Date(newsData.generatedAt).toLocaleString('ja-JP')}</p>
 
         <h2 style="color: #2980b9; margin-top: 30px; border-left: 5px solid #3498db; padding-left: 10px;">🌟 ヘッドライン（要約）</h2>
@@ -89,7 +92,8 @@ export async function sendEmailWithNews(newsData) {
     htmlContent += `
         </ul>
         <div style="margin-top: 40px; text-align: center; border-top: 2px solid #eee; padding-top: 20px;">
-            <p style="color: #7f8c8d; font-size: 0.9em;">このメールは、AIニュース収集システムから自動送信されています。<br>ブラウザ上で美しく表示されたアプリビューもご利用ください。</p>
+            <a href="https://hiroshinmm.github.io/ai-news-bot/" style="color: #3498db; font-weight: bold; font-size: 1.1em; text-decoration: none;">ニュースダッシュボード (Web) を開く</a>
+            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 15px;">このメールは、AIニュース収集システムから自動送信されています。</p>
         </div>
     </div>
     `;
