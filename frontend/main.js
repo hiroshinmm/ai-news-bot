@@ -1,6 +1,6 @@
 document.getElementById('year').textContent = new Date().getFullYear();
 
-const DATA_URL = '/latest_news.json';
+const DATA_URL = 'latest_news.json';
 
 async function fetchAndRenderNews() {
     const statusEl = document.getElementById('status-message');
