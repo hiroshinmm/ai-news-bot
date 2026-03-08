@@ -1,21 +1,21 @@
 :root {
-  --bg-color: #f1f5f9;
-  /* 落ち着いたスレートグレー */
-  --panel-bg: rgba(255, 255, 255, 0.95);
+  --bg-color: #f8fafc;
+  /* 清潔感のある極薄いグレー・ミント寄り */
+  --panel-bg: #ffffff;
   --text-primary: #1e293b;
-  --text-secondary: #475569;
-  /* 少し濃いめのグレー */
-  --accent-primary: #e0f2fe;
-  /* 淡いブルー */
-  --accent-text: #0284c7;
-  /* 落ち着いたブルー */
-  --accent-alt: #f1f5f9;
-  --accent-alt-text: #64748b;
-  --border-color: #cbd5e1;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --text-secondary: #64748b;
+  --accent-primary: #e8fdf5;
+  /* ミント系 */
+  --accent-text: #059669;
+  /* セージグリーン */
+  --accent-alt: #fde8e8;
+  /* ソフトピンク */
+  --accent-alt-text: #dc2626;
+  --border-color: #e2e8f0;
+  --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   --font-main: 'Inter', sans-serif;
   --font-heading: 'Outfit', sans-serif;
-  --radius: 20px;
+  --radius: 24px;
 }
 
 * {
@@ -27,11 +27,11 @@
 body {
   font-family: var(--font-main);
   background-color: var(--bg-color);
-  background-image: linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%);
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
-  background-attachment: fixed;
+  /* 背景のグラデーションを廃止しフラット化 */
+  background-image: none;
 }
 
 /* Header */
@@ -50,7 +50,7 @@ header {
 }
 
 .logo span {
-  background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+  background: linear-gradient(135deg, #059669 0%, #34d399 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
