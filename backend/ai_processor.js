@@ -59,15 +59,46 @@ export async function processNewsWithAI(newsItems) {
 ${newsListString}
 `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
-      contents: prompt,
-      config: {
-        temperature: 0.2,
-      }
-    });
+  // 試行するモデルの優先順位リスト
+  const MODELS_TO_TRY = [
+    'gemini-3.1-flash-lite-preview',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash'
+  ];
 
+  let response;
+  let usedModel = '';
+
+  for (const modelName of MODELS_TO_TRY) {
+    try {
+      console.log(`🤖 Trying AI processing with model: ${modelName}...`);
+      response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          temperature: 0.2,
+        }
+      });
+      usedModel = modelName;
+      console.log(`✅ AI processing successful with model: ${modelName}`);
+      break; // 成功したらループを抜ける
+    } catch (error) {
+      if (error.status === 429 || error.message?.includes('quota') || error.message?.includes('429')) {
+        console.warn(`⚠️ Quota exceeded for model ${modelName}. Trying next model...`);
+        continue;
+      }
+      // クォータ以外のエラー（404など）でも次を試す
+      console.warn(`❌ Error with model ${modelName}: ${error.message}. Trying next model...`);
+      continue;
+    }
+  }
+
+  if (!response) {
+    console.error('❌ All AI models failed or exceeded quota.');
+    return null;
+  }
+
+  try {
     let responseText = response.text;
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -124,6 +155,7 @@ ${newsListString}
 
     // generatedAtを付加して正確な時間に
     processedData.generatedAt = new Date().toISOString();
+    processedData.aiModelUsed = usedModel; // どのモデルが使われたか記録
 
     // データの保存ディレクトリの確認と作成
     const dataDir = path.resolve('data');
@@ -138,7 +170,7 @@ ${newsListString}
     return processedData;
 
   } catch (error) {
-    console.error('❌ Error during AI processing:', error);
+    console.error('❌ Unexpected error during AI response processing:', error);
     return null;
   }
 }
