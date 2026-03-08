@@ -42,6 +42,49 @@ function decodeGoogleNewsUrl(encodedUrl) {
     }
 }
 
+/**
+ * オンラインでリダイレクトを追跡してURLを解決する（フォールバック）
+ */
+async function resolveUrlOnline(googleUrl) {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5秒タイムアウト
+
+        const response = await fetch(googleUrl, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            }
+        });
+        clearTimeout(timeout);
+
+        const text = await response.text();
+
+        // メタリフレッシュや特定の要素からURLを抽出
+        const refreshMatch = text.match(/url=(http[^"]+)"/i);
+        if (refreshMatch) return refreshMatch[1];
+
+        const dataUrlMatch = text.match(/data-url="([^"]+)"/);
+        if (dataUrlMatch) return dataUrlMatch[1];
+
+        // 最終手段：google以外のそれっぽいリンクを探す
+        const links = text.match(/https?:\/\/[^\s"'<>]+/g);
+        if (links) {
+            const realLink = links.find(l =>
+                !l.includes('google.com') &&
+                !l.includes('gstatic.com') &&
+                l.length > 30
+            );
+            if (realLink) return realLink;
+        }
+
+        return googleUrl;
+    } catch (e) {
+        return googleUrl;
+    }
+}
+
 export async function fetchNews() {
     console.log('📰 Fetching news from RSS feeds...');
     let allNews = [];
@@ -51,12 +94,21 @@ export async function fetchNews() {
             console.log(`- Fetching: ${feed.name}`);
             const fetchedFeed = await parser.parseURL(feed.url);
 
-            const articles = fetchedFeed.items.map(item => ({
-                source: feed.name,
-                title: item.title,
-                link: decodeGoogleNewsUrl(item.link),
-                pubDate: item.pubDate,
-                contentSnippet: item.contentSnippet || item.content || ''
+            const articles = await Promise.all(fetchedFeed.items.map(async (item) => {
+                let link = decodeGoogleNewsUrl(item.link);
+
+                // デコードに失敗し（＝元のURLが取れず）、かつGoogle Newsのリンクのままの場合のみオンライン解決を試みる
+                if (link.includes('news.google.com')) {
+                    link = await resolveUrlOnline(link);
+                }
+
+                return {
+                    source: feed.name,
+                    title: item.title,
+                    link: link,
+                    pubDate: item.pubDate,
+                    contentSnippet: item.contentSnippet || item.content || ''
+                };
             }));
 
             allNews = allNews.concat(articles);
@@ -78,5 +130,9 @@ export async function fetchNews() {
 
 // 単体テスト用
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-    fetchNews().then(news => console.log(`Found ${news.length} articles.`));
+    fetchNews().then(news => {
+        console.log(`Found ${news.length} articles.`);
+        console.log('Sample URL (first 3):');
+        news.slice(0, 3).forEach(n => console.log(`- ${n.title}\n  Link: ${n.link}`));
+    });
 }
