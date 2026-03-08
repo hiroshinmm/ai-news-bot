@@ -38,6 +38,7 @@ async function fetchAndRenderNews() {
 function formatDate(dateString) {
     if (!dateString) return 'Unknown Date';
     const d = new Date(dateString);
+    if (isNaN(d.getTime())) return 'Unknown Date'; // 無効な日付のチェック
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
@@ -92,7 +93,6 @@ function renderOtherNews(otherNews) {
     container.innerHTML = otherNews.map(news => `
         <a href="${news.link}" target="_blank" rel="noopener noreferrer" class="list-item">
             <div class="list-item-title" title="${news.title}">${news.title}</div>
-            <div class="source-badge">${news.source}</div>
         </a>
     `).join('');
 }

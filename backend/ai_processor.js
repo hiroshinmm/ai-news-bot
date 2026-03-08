@@ -39,20 +39,18 @@ export async function processNewsWithAI(newsItems) {
 {
   "headlines": [
     {
+      "id": "リストの[n]に相当する番号",
       "title": "記事のタイトル",
       "summary": "要約文（150文字程度）",
-      "source": "ニュース元の名前",
-      "link": "記事のURL",
-      "pubDate": "記事の日時文字列"
+      "source": "ニュース元の名前"
     }
   ],
   "subNews": [
     {
+      "id": "リストの[n]に相当する番号",
       "title": "記事のタイトル",
       "summary": "要約文（100文字程度）",
-      "source": "ニュース元の名前",
-      "link": "記事のURL",
-      "pubDate": "記事の日時文字列"
+      "source": "ニュース元の名前"
     }
   ]
 }
@@ -85,6 +83,27 @@ ${newsListString}
       console.log(responseText);
       console.log('-----------------------');
       return null;
+    }
+
+    // AIの回答をもとに、オリジナルのデータを紐付け直す（リンクと日付の改変防止）
+    const restoreMetadata = (item) => {
+      const original = newsItems[parseInt(item.id)];
+      if (original) {
+        return {
+          ...item,
+          link: original.link,
+          pubDate: original.pubDate,
+          source: original.source // ソース名もオリジナルを優先
+        };
+      }
+      return item;
+    };
+
+    if (processedData.headlines) {
+      processedData.headlines = processedData.headlines.map(restoreMetadata);
+    }
+    if (processedData.subNews) {
+      processedData.subNews = processedData.subNews.map(restoreMetadata);
     }
 
     // 選ばれた記事のURLをセットにまとめる
