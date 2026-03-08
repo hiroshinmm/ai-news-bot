@@ -61,7 +61,7 @@ ${newsListString}
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.1-flash-lite-preview',
       contents: prompt,
       config: {
         temperature: 0.2,
