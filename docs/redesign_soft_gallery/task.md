@@ -50,3 +50,16 @@
   - [x] `frontend/main.js` または `style.css` で「その他のニュース」のバッジを削除
   - [x] `main.js` の `formatDate` で無効な日付をハンドリング
   - [x] 変更内容をGitHubにPush
+
+- [x] 10. APIクォータと404エラーの修正
+  - [x] `backend/ai_processor.js` のモデルを `gemini-3.1-flash-lite-preview` に変更
+  - [x] `backend/fetcher.js` から TechCrunch Japan のフィードを削除
+  - [x] 変更内容をGitHubにPush
+
+- [x] 11. デザイン刷新 (Concept B-3: Soft Gallery) & 全件要約
+  - [x] `backend/ai_processor.js` のプロンプトを修正し、全てのニュースに要約を作成するように変更
+  - [x] Google Fonts (Outfit, Inter) のインポート追加 (`frontend/index.html`)
+  - [x] `frontend/style.css` をSoft Galleryデザイン（白背景、大きな角丸、ソフトシャドウ、パステル色）に全面書き換え
+  - [x] `frontend/main.js` で全てのニュース項目に要約を表示するようにDOM構築ロジックを修正
+  - [x] レスポンシブ表示の最終確認
+  - [x] 変更内容をGitHubにPush

@@ -26,12 +26,13 @@ export async function processNewsWithAI(newsItems) {
   ).join('\n---\n');
 
   const prompt = `
-あなたはプロのITジャーナリストです。以下のAI関連ニュース記事のリストから、今日の重要なトピックを選定し、指定されたJSON形式で出力してください。
+あなたはプロのITジャーナリストです。以下のAI関連ニュース記事のリストすべてを分析し、指定されたJSON形式で出力してください。
 
 【タスク】
-1. リストの中で最も重要と思われる「ヘッドラインニュース」を3件選び、それぞれ150文字程度で日本語で要約してください。
-2. 次に重要と思われる「次点のニュース」を10件選び、それぞれ100文字程度の日本語の要約を付けてください。
-3. 出力には、選んだ計13件のニュースのみを含めてください。「その他のニュース」は出力に含めないでください。
+1. リストの中で最も重要と思われる「ヘッドラインニュース」を3件選び、それぞれ200文字程度で日本語で要約してください。
+2. 次に重要と思われる「次点のニュース」を10件選び、それぞれ150文字程度の日本語の要約を付けてください。
+3. 残りのすべてのニュース記事（約30〜40件程度）を「その他のニュース」として、それぞれ100文字程度の日本語の要約を付けてください。
+4. 提供された「ニュース記事リスト」にある全記事（50件程度）を、漏れなくこれら3つのカテゴリのいずれかに分類して出力してください。
 
 【出力形式】
 以下の構造の有効なJSONのみを出力してください。マークダウンの記法（\`\`\`json など）は含めないでください。
@@ -41,11 +42,19 @@ export async function processNewsWithAI(newsItems) {
     {
       "id": "リストの[n]に相当する番号",
       "title": "記事のタイトル",
-      "summary": "要約文（150文字程度）",
+      "summary": "要約文（200文字程度）",
       "source": "ニュース元の名前"
     }
   ],
   "subNews": [
+    {
+      "id": "リストの[n]に相当する番号",
+      "title": "記事のタイトル",
+      "summary": "要約文（150文字程度）",
+      "source": "ニュース元の名前"
+    }
+  ],
+  "otherNews": [
     {
       "id": "リストの[n]に相当する番号",
       "title": "記事のタイトル",
@@ -136,22 +145,9 @@ ${newsListString}
     if (processedData.subNews) {
       processedData.subNews = processedData.subNews.map(restoreMetadata);
     }
-
-    // 選ばれた記事のURLをセットにまとめる
-    const selectedUrls = new Set([
-      ...(processedData.headlines || []).map(n => n.link),
-      ...(processedData.subNews || []).map(n => n.link)
-    ]);
-
-    // 選ばれなかった残りの記事を otherNews としてスクリプト側で追加する
-    processedData.otherNews = newsItems
-      .filter(n => !selectedUrls.has(n.link))
-      .map(n => ({
-        title: n.title,
-        source: n.source,
-        link: n.link,
-        pubDate: n.pubDate
-      }));
+    if (processedData.otherNews) {
+      processedData.otherNews = processedData.otherNews.map(restoreMetadata);
+    }
 
     // generatedAtを付加して正確な時間に
     processedData.generatedAt = new Date().toISOString();

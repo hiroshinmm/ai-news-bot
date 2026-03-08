@@ -93,6 +93,11 @@ function renderOtherNews(otherNews) {
     container.innerHTML = otherNews.map(news => `
         <a href="${news.link}" target="_blank" rel="noopener noreferrer" class="list-item">
             <div class="list-item-title" title="${news.title}">${news.title}</div>
+            ${news.summary ? `<div class="list-item-summary">${news.summary}</div>` : ''}
+            <div class="list-item-meta">
+                <span class="source-badge">${news.source}</span>
+                <span>${formatDate(news.pubDate)}</span>
+            </div>
         </a>
     `).join('');
 }

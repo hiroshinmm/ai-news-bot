@@ -79,9 +79,10 @@ export async function sendEmailWithNews(newsData) {
     if (newsData.otherNews && newsData.otherNews.length > 0) {
         newsData.otherNews.forEach(news => {
             htmlContent += `
-            <li style="margin-bottom: 8px;">
-                📝 <a href="${news.link}" style="color: #34495e; text-decoration: none;">${news.title}</a>
+            <li style="margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;">
+                📝 <a href="${news.link}" style="color: #34495e; text-decoration: none; font-weight: bold;">${news.title}</a>
                 <span style="color: #95a5a6; font-size: 0.8em; margin-left: 5px;">(${news.source})</span>
+                ${news.summary ? `<p style="margin: 4px 0 0 25px; color: #666; font-size: 0.9em;">${news.summary}</p>` : ''}
             </li>
             `;
         });
