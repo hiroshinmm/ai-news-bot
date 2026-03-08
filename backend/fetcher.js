@@ -5,7 +5,6 @@ const parser = new Parser();
 // RSSフィードのURLリスト（AI関連のニュースソース）
 const FEEDS = [
     { name: 'Google News (AI)', url: 'https://news.google.com/rss/search?q=AI+OR+%E4%BA%BA%E5%B7%A5%E7%9F%A5%E8%83%BD&hl=ja&gl=JP&ceid=JP:ja' },
-    { name: 'TechCrunch Japan (AI)', url: 'https://jp.techcrunch.com/category/artificial-intelligence/feed/' },
     { name: 'ITmedia AI+', url: 'https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml' }, // AI専用RSSがないため総合、後でフィルタ
     { name: 'Zenn (Machine Learning)', url: 'https://zenn.dev/topics/machinelearning/feed' },
     { name: 'Zenn (AI)', url: 'https://zenn.dev/topics/ai/feed' }
