@@ -11,6 +11,37 @@ const FEEDS = [
     { name: 'Zenn (AI)', url: 'https://zenn.dev/topics/ai/feed' }
 ];
 
+/**
+ * Google NewsのリンクからオリジナルのURLを抽出する（Base64デコード）
+ */
+function decodeGoogleNewsUrl(encodedUrl) {
+    if (!encodedUrl.includes('news.google.com')) return encodedUrl;
+    try {
+        const urlObj = new URL(encodedUrl);
+        const pathParts = urlObj.pathname.split('/');
+        const base64Str = pathParts[pathParts.length - 1];
+
+        // Base64デコード（binaryとして読み込む）
+        const decoded = Buffer.from(base64Str, 'base64').toString('binary');
+
+        // "http" 以降の文字列を抽出
+        const start = decoded.indexOf('http');
+        if (start === -1) return encodedUrl;
+
+        let url = decoded.substring(start);
+
+        // 制御文字やバイナリゴミを除去（URLとして有効な文字範囲のみを抽出）
+        const match = url.match(/[^\x20-\x7E]/);
+        if (match) {
+            url = url.substring(0, match.index);
+        }
+
+        return url;
+    } catch (e) {
+        return encodedUrl;
+    }
+}
+
 export async function fetchNews() {
     console.log('📰 Fetching news from RSS feeds...');
     let allNews = [];
@@ -23,7 +54,7 @@ export async function fetchNews() {
             const articles = fetchedFeed.items.map(item => ({
                 source: feed.name,
                 title: item.title,
-                link: item.link,
+                link: decodeGoogleNewsUrl(item.link),
                 pubDate: item.pubDate,
                 contentSnippet: item.contentSnippet || item.content || ''
             }));

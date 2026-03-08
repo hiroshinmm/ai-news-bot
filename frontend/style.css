@@ -314,10 +314,11 @@ header {
 .compact .list-item-title {
   font-size: 0.95rem;
   margin-bottom: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 70%;
+  /* モバイルでタイトルがしっかり読めるよう改行を許可 */
+  white-space: normal;
+  word-break: break-all;
+  max-width: 80%;
+  line-height: 1.4;
 }
 
 .compact .source-badge {
