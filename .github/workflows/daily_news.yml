@@ -1,5 +1,7 @@
 name: Daily AI News Collection and Deploy
 on:
+  push:
+    branches: [ main ]
   schedule:
     # 毎朝7:00 JSTに実行 (UTCで前日22:00)
     - cron: '0 22 * * *'
