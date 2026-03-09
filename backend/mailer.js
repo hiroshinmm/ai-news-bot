@@ -102,7 +102,7 @@ export async function sendEmailWithNews(newsData) {
     let mailOptions = {
         from: GMAIL_USER, // 自分のアドレスから
         to: GMAIL_USER,   // 自分のアドレスへ
-        subject: `Daily AI News Summary - ${new Date().toLocaleDateString('ja-JP')}`,
+        subject: `Daily AI News Summary - ${new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}`,
         html: htmlContent
     };
 
