@@ -18,55 +18,15 @@ export async function processNewsWithAI(newsItems) {
     return null;
   }
 
-  console.log(`🤖 Processing ${newsItems.length} news items with Gemini AI...`);
+  const MAX_CONCURRENT_ITEMS = 50;
+  const itemsToProcess = newsItems.slice(0, MAX_CONCURRENT_ITEMS);
+
+  console.log(`🤖 Processing ${itemsToProcess.length} news items with Gemini AI (Batch Mode)...`);
 
   // AIに渡すための記事リスト文字列を作成
-  const newsListString = newsItems.map((item, index) =>
-    `[${index}] ${item.title} (Source: ${item.source})\nLink: ${item.link}\nSnippet: ${item.contentSnippet}\n`
+  const newsListString = itemsToProcess.map((item, index) =>
+    `[${index}] ${item.title} (Source: ${item.source})\nSnippet: ${item.contentSnippet}\n`
   ).join('\n---\n');
-
-  const prompt = `
-あなたはプロのITジャーナリストです。以下のAI関連ニュース記事のリストすべてを分析し、指定されたJSON形式で出力してください。
-
-【タスク】
-1. リストの中で最も重要と思われる「ヘッドラインニュース」を3件選び、それぞれ200文字程度の日本語で詳しく要約してください。
-2. 次に重要と思われる「次点のニュース」を10件選び、それぞれ150文字程度の日本語で詳しく要約してください。
-3. 残りのすべてのニュース記事（約30〜40件程度）を「その他のニュース」として、それぞれ150文字程度の日本語で要約してください。
-   - 情報量が少ない場合でも、そのニュースの背景や関連するカテゴリーについて解説を加え、必ず150文字程度のボリュームを確保してください。
-
-【出力形式】
-以下の構造の有効なJSONのみを出力してください。マークダウンの記法（\`\`\`json など）は含めないでください。各要約フィールド（summary）は指示された文字数を満たすよう注意してください。
-
-{
-  "headlines": [
-    {
-      "id": "リストの[n]に相当する番号",
-      "title": "記事のタイトル",
-      "summary": "要約文（200文字程度。詳しく記述してください）",
-      "source": "ニュース元の名前"
-    }
-  ],
-  "subNews": [
-    {
-      "id": "リストの[n]に相当する番号",
-      "title": "記事のタイトル",
-      "summary": "要約文（150文字程度。詳しく記述してください）",
-      "source": "ニュース元の名前"
-    }
-  ],
-  "otherNews": [
-    {
-      "id": "リストの[n]に相当する番号",
-      "title": "記事のタイトル",
-      "summary": "要約文（150文字程度。記事の内容と背景を詳しく記述してください）",
-      "source": "ニュース元の名前"
-    }
-  ]
-}
-
-【ニュース記事リスト】
-${newsListString}
-`;
 
   // 試行するモデルの優先順位リスト
   const MODELS_TO_TRY = [
@@ -75,98 +35,148 @@ ${newsListString}
     'gemini-2.5-flash'
   ];
 
-  let response;
-  let usedModel = '';
-
-  for (const modelName of MODELS_TO_TRY) {
-    try {
-      console.log(`🤖 Trying AI processing with model: ${modelName}...`);
-      response = await ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: {
-          temperature: 0.2,
-        }
-      });
-      usedModel = modelName;
-      console.log(`✅ AI processing successful with model: ${modelName}`);
-      break; // 成功したらループを抜ける
-    } catch (error) {
-      if (error.status === 429 || error.message?.includes('quota') || error.message?.includes('429')) {
-        console.warn(`⚠️ Quota exceeded for model ${modelName}. Trying next model...`);
-        continue;
+  async function callGemini(prompt, modelName) {
+    console.log(`🤖 Calling Gemini with model: ${modelName}...`);
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
       }
-      // クォータ以外のエラー（404など）でも次を試す
-      console.warn(`❌ Error with model ${modelName}: ${error.message}. Trying next model...`);
-      continue;
+    });
+    
+    if (!response || !response.text) {
+      throw new Error('Empty response from AI');
     }
+    
+    // JSON文字列を抽出（念のため）
+    let text = response.text;
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) text = jsonMatch[0];
+    
+    return JSON.parse(text);
   }
 
-  if (!response) {
-    console.error('❌ All AI models failed or exceeded quota.');
+  async function tryWithModels(prompt) {
+    for (const modelName of MODELS_TO_TRY) {
+      try {
+        const data = await callGemini(prompt, modelName);
+        return { data, modelName };
+      } catch (error) {
+        console.warn(`⚠️ Error with model ${modelName}: ${error.message}.`);
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+            console.warn(`Model ${modelName} not found, trying next...`);
+            continue;
+        }
+        // 他のエラーでも次を試す
+        continue;
+      }
+    }
     return null;
   }
 
   try {
-    let responseText = response.text;
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      responseText = jsonMatch[0];
+    // --- STEP 1: Selection & Major News ---
+    const step1Prompt = `
+あなたはプロのITジャーナリストです。以下のAI関連ニュース記事リストから、最も重要な3件を「headlines」、次に重要な10件を「subNews」として選別し、要約してください。
+また、選ばれなかった残りの記事のインデックス番号を「remainingIndices」としてすべてリストアップしてください。
+
+【要件】
+- headlines: 各200文字程度の日本語で詳しく要約。
+- subNews: 各150文字程度の日本語で詳しく要約。
+
+【出力JSON形式】
+{
+  "headlines": [{ "id": "インデックス番号", "title": "タイトル", "summary": "200文字要約", "source": "ソース" }],
+  "subNews": [{ "id": "インデックス番号", "title": "タイトル", "summary": "150文字要約", "source": "ソース" }],
+  "remainingIndices": [数字の配列]
+}
+
+【ニュース記事リスト】
+${newsListString}
+`;
+
+    const step1Result = await tryWithModels(step1Prompt);
+    if (!step1Result) throw new Error('Step 1 AI processing failed');
+
+    const { data: step1Data, modelName: usedModel } = step1Result;
+    console.log(`✅ Step 1 complete using ${usedModel}. Selected ${step1Data.headlines.length} headlines and ${step1Data.subNews.length} subNews.`);
+
+    // --- STEP 2: Process Remaining News ---
+    let otherNewsResults = [];
+    const remainingIndices = step1Data.remainingIndices || [];
+
+    if (remainingIndices.length > 0) {
+      // 残りが多い場合はさらに分割して処理
+      const batchSize = 20;
+      for (let i = 0; i < remainingIndices.length; i += batchSize) {
+        const batchIndices = remainingIndices.slice(i, i + batchSize);
+        const batchListString = batchIndices.map(idx => {
+          const item = itemsToProcess[idx];
+          return `[${idx}] ${item.title} (Source: ${item.source})\nSnippet: ${item.contentSnippet}\n`;
+        }).join('\n---\n');
+
+        console.log(`🤖 Processing Batch ${Math.floor(i / batchSize) + 1} of remaining news (${batchIndices.length} items)...`);
+        
+        const step2Prompt = `
+以下のニュース記事リストを「その他のニュース（otherNews）」として、それぞれ150文字程度の日本語で詳しく要約してください。
+情報量が少ない場合でも、背景や関連カテゴリーについて解説を加え、必ず150文字程度のボリュームを確保してください。
+
+【出力JSON形式】
+{
+  "otherNews": [{ "id": "インデックス番号", "title": "タイトル", "summary": "150文字要約", "source": "ソース" }]
+}
+
+【ニュース記事リスト】
+${batchListString}
+`;
+        const step2Result = await tryWithModels(step2Prompt);
+        if (step2Result) {
+          otherNewsResults = otherNewsResults.concat(step2Result.data.otherNews);
+        }
+      }
     }
 
-    let processedData = {};
-    try {
-      processedData = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ Failed to parse JSON from AI response:', parseError);
-      console.log('--- RAW AI RESPONSE ---');
-      console.log(responseText);
-      console.log('-----------------------');
-      return null;
-    }
+    // --- Data Reconstruction & MetaData Recovery ---
+    const processedData = {
+      headlines: step1Data.headlines,
+      subNews: step1Data.subNews,
+      otherNews: otherNewsResults,
+      generatedAt: new Date().toISOString(),
+      aiModelUsed: usedModel
+    };
 
-    // AIの回答をもとに、オリジナルのデータを紐付け直す（リンクと日付の改変防止）
     const restoreMetadata = (item) => {
-      const original = newsItems[parseInt(item.id)];
+      const original = itemsToProcess[parseInt(item.id)];
       if (original) {
         return {
           ...item,
           link: original.link,
           pubDate: original.pubDate,
-          source: original.source // ソース名もオリジナルを優先
+          source: original.source
         };
       }
       return item;
     };
 
-    if (processedData.headlines) {
-      processedData.headlines = processedData.headlines.map(restoreMetadata);
-    }
-    if (processedData.subNews) {
-      processedData.subNews = processedData.subNews.map(restoreMetadata);
-    }
-    if (processedData.otherNews) {
-      processedData.otherNews = processedData.otherNews.map(restoreMetadata);
-    }
+    processedData.headlines = (processedData.headlines || []).map(restoreMetadata);
+    processedData.subNews = (processedData.subNews || []).map(restoreMetadata);
+    processedData.otherNews = (processedData.otherNews || []).map(restoreMetadata);
 
-    // generatedAtを付加して正確な時間に
-    processedData.generatedAt = new Date().toISOString();
-    processedData.aiModelUsed = usedModel; // どのモデルが使われたか記録
-
-    // データの保存ディレクトリの確認と作成
+    // Save Data
     const dataDir = path.resolve('data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
     const outputPath = path.resolve(dataDir, 'latest_news.json');
     fs.writeFileSync(outputPath, JSON.stringify(processedData, null, 2));
 
-    console.log(`✅ AI processing complete. Data saved to ${outputPath}`);
+    console.log(`✅ AI processing complete. Total ${processedData.headlines.length + processedData.subNews.length + processedData.otherNews.length} items processed.`);
     return processedData;
 
   } catch (error) {
-    console.error('❌ Unexpected error during AI response processing:', error);
+    console.error('❌ AI response processing error:', error);
     return null;
   }
 }
