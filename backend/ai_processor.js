@@ -28,12 +28,26 @@ export async function processNewsWithAI(newsItems) {
     `[${index}] ${item.title} (Source: ${item.source})\nSnippet: ${item.contentSnippet}\n`
   ).join('\n---\n');
 
-  // 試行するモデルの優先順位リスト
   const MODELS_TO_TRY = [
-    'gemini-3.1-flash-lite-preview',
     'gemini-2.5-flash-lite',
-    'gemini-2.5-flash'
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
   ];
+
+  function extractJson(text) {
+    // マークダウンコードブロックを除去
+    const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlock) text = codeBlock[1].trim();
+
+    // 最外殻の {} を抽出
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      text = text.substring(start, end + 1);
+    }
+    return JSON.parse(text);
+  }
 
   async function callGemini(prompt, modelName) {
     console.log(`🤖 Calling Gemini with model: ${modelName}...`);
@@ -46,32 +60,42 @@ export async function processNewsWithAI(newsItems) {
         maxOutputTokens: 8192,
       }
     });
-    
+
     if (!response || !response.text) {
       throw new Error('Empty response from AI');
     }
-    
-    // JSON文字列を抽出（念のため）
-    let text = response.text;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) text = jsonMatch[0];
-    
-    return JSON.parse(text);
+
+    return extractJson(response.text);
+  }
+
+  // 503/429 は一時的な問題なのでリトライする
+  async function callWithRetry(prompt, modelName, maxRetries = 3) {
+    let delay = 10000; // 10秒から開始
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await callGemini(prompt, modelName);
+      } catch (error) {
+        const isTransient = error.message?.includes('503') || error.message?.includes('429')
+          || error.message?.includes('UNAVAILABLE') || error.message?.includes('Resource exhausted');
+        if (isTransient && attempt < maxRetries) {
+          console.warn(`⚠️ Model ${modelName} transient error (attempt ${attempt}/${maxRetries}), retrying in ${delay / 1000}s...`);
+          await new Promise(r => setTimeout(r, delay));
+          delay *= 2; // 指数バックオフ
+        } else {
+          throw error;
+        }
+      }
+    }
   }
 
   async function tryWithModels(prompt) {
     for (const modelName of MODELS_TO_TRY) {
       try {
-        const data = await callGemini(prompt, modelName);
+        const data = await callWithRetry(prompt, modelName);
         return { data, modelName };
       } catch (error) {
         console.warn(`⚠️ Error with model ${modelName}: ${error.message}.`);
-        if (error.message?.includes('404') || error.message?.includes('not found')) {
-            console.warn(`Model ${modelName} not found, trying next...`);
-            continue;
-        }
-        // 他のエラーでも次を試す
-        continue;
+        // 次のモデルへ
       }
     }
     return null;
