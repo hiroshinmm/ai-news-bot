@@ -84,6 +84,23 @@ async function resolveUrlOnline(googleUrl) {
     }
 }
 
+async function parseFeedWithRetry(url, maxRetries = 2) {
+    let delay = 3000;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+            return await parser.parseURL(url);
+        } catch (error) {
+            if (attempt <= maxRetries) {
+                console.warn(`  ⚠️ Retry ${attempt}/${maxRetries} in ${delay / 1000}s...`);
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
 export async function fetchNews() {
     console.log('📰 Fetching news from RSS feeds...');
     let allNews = [];
@@ -91,7 +108,7 @@ export async function fetchNews() {
     for (const feed of FEEDS) {
         try {
             console.log(`- Fetching: ${feed.name}`);
-            const fetchedFeed = await parser.parseURL(feed.url);
+            const fetchedFeed = await parseFeedWithRetry(feed.url);
 
             const articles = await Promise.all(fetchedFeed.items.map(async (item) => {
                 let link = decodeGoogleNewsUrl(item.link);

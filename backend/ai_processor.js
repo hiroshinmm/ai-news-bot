@@ -29,10 +29,10 @@ export async function processNewsWithAI(newsItems) {
   ).join('\n---\n');
 
   const MODELS_TO_TRY = [
+    'gemini-3.1-flash-lite-preview',
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-1.5-flash',
   ];
 
   function extractJson(text) {
@@ -94,6 +94,12 @@ export async function processNewsWithAI(newsItems) {
         const data = await callWithRetry(prompt, modelName);
         return { data, modelName };
       } catch (error) {
+        // 認証エラーは他モデルを試しても無意味なので即停止
+        if (error.message?.includes('401') || error.message?.includes('403')
+            || error.message?.includes('API_KEY_INVALID')) {
+          console.error(`❌ API key error: ${error.message}`);
+          return null;
+        }
         console.warn(`⚠️ Error with model ${modelName}: ${error.message}.`);
         // 次のモデルへ
       }

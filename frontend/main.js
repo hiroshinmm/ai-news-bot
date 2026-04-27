@@ -2,6 +2,20 @@ document.getElementById('year').textContent = new Date().getFullYear();
 
 const DATA_URL = 'latest_news.json';
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function safeLink(url) {
+    return url && /^https?:\/\//i.test(url) ? url : '#';
+}
+
 async function fetchAndRenderNews() {
     const statusEl = document.getElementById('status-message');
     const contentEl = document.getElementById('news-content');
@@ -49,16 +63,16 @@ function renderHeadlines(headlines) {
         return;
     }
 
-    container.innerHTML = headlines.map((news, index) => `
+    container.innerHTML = headlines.map(news => `
         <article class="glass-panel headline-card">
-            <div class="card-source">${news.source}</div>
+            <div class="card-source">${escapeHtml(news.source)}</div>
             <h3 class="card-title">
-                <a href="${news.link}" target="_blank" rel="noopener noreferrer">${news.title}</a>
+                <a href="${escapeHtml(safeLink(news.link))}" target="_blank" rel="noopener noreferrer">${escapeHtml(news.title)}</a>
             </h3>
-            <p class="card-summary">${news.summary}</p>
+            <p class="card-summary">${escapeHtml(news.summary)}</p>
             <div class="card-meta">
-                <span class="card-date">${formatDate(news.pubDate)}</span>
-                <a href="${news.link}" target="_blank" rel="noopener noreferrer" class="read-more">Read Source <span>→</span></a>
+                <span class="card-date">${escapeHtml(formatDate(news.pubDate))}</span>
+                <a href="${escapeHtml(safeLink(news.link))}" target="_blank" rel="noopener noreferrer" class="read-more">Read Source <span>→</span></a>
             </div>
         </article>
     `).join('');
@@ -72,12 +86,12 @@ function renderSubNews(subNews) {
     }
 
     container.innerHTML = subNews.map(news => `
-        <a href="${news.link}" target="_blank" rel="noopener noreferrer" class="list-item">
-            <div class="list-item-title">${news.title}</div>
-            ${news.summary ? `<div class="list-item-summary">${news.summary}</div>` : ''}
+        <a href="${escapeHtml(safeLink(news.link))}" target="_blank" rel="noopener noreferrer" class="list-item">
+            <div class="list-item-title">${escapeHtml(news.title)}</div>
+            ${news.summary ? `<div class="list-item-summary">${escapeHtml(news.summary)}</div>` : ''}
             <div class="list-item-meta">
-                <span class="source-badge">${news.source}</span>
-                <span>${formatDate(news.pubDate)}</span>
+                <span class="source-badge">${escapeHtml(news.source)}</span>
+                <span>${escapeHtml(formatDate(news.pubDate))}</span>
             </div>
         </a>
     `).join('');
@@ -91,12 +105,12 @@ function renderOtherNews(otherNews) {
     }
 
     container.innerHTML = otherNews.map(news => `
-        <a href="${news.link}" target="_blank" rel="noopener noreferrer" class="list-item">
-            <div class="list-item-title" title="${news.title}">${news.title}</div>
-            ${news.summary ? `<div class="list-item-summary">${news.summary}</div>` : ''}
+        <a href="${escapeHtml(safeLink(news.link))}" target="_blank" rel="noopener noreferrer" class="list-item">
+            <div class="list-item-title" title="${escapeHtml(news.title)}">${escapeHtml(news.title)}</div>
+            ${news.summary ? `<div class="list-item-summary">${escapeHtml(news.summary)}</div>` : ''}
             <div class="list-item-meta">
-                <span class="source-badge">${news.source}</span>
-                <span>${formatDate(news.pubDate)}</span>
+                <span class="source-badge">${escapeHtml(news.source)}</span>
+                <span>${escapeHtml(formatDate(news.pubDate))}</span>
             </div>
         </a>
     `).join('');
