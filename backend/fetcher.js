@@ -103,35 +103,37 @@ async function parseFeedWithRetry(url, maxRetries = 2) {
 
 export async function fetchNews() {
     console.log('📰 Fetching news from RSS feeds...');
-    let allNews = [];
+    const feedResults = await Promise.allSettled(FEEDS.map(async (feed) => {
+        console.log(`- Fetching: ${feed.name}`);
+        const fetchedFeed = await parseFeedWithRetry(feed.url);
 
-    for (const feed of FEEDS) {
-        try {
-            console.log(`- Fetching: ${feed.name}`);
-            const fetchedFeed = await parseFeedWithRetry(feed.url);
+        return Promise.all(fetchedFeed.items.map(async (item) => {
+            let link = decodeGoogleNewsUrl(item.link);
 
-            const articles = await Promise.all(fetchedFeed.items.map(async (item) => {
-                let link = decodeGoogleNewsUrl(item.link);
+            // デコードに失敗し（＝元のURLが取れず）、かつGoogle Newsのリンクのままの場合のみオンライン解決を試みる
+            if (link.includes('news.google.com')) {
+                link = await resolveUrlOnline(link);
+            }
 
-                // デコードに失敗し（＝元のURLが取れず）、かつGoogle Newsのリンクのままの場合のみオンライン解決を試みる
-                if (link.includes('news.google.com')) {
-                    link = await resolveUrlOnline(link);
-                }
+            return {
+                source: feed.name,
+                title: item.title,
+                link: link,
+                pubDate: item.pubDate,
+                contentSnippet: item.contentSnippet || item.content || ''
+            };
+        }));
+    }));
 
-                return {
-                    source: feed.name,
-                    title: item.title,
-                    link: link,
-                    pubDate: item.pubDate,
-                    contentSnippet: item.contentSnippet || item.content || ''
-                };
-            }));
-
-            allNews = allNews.concat(articles);
-        } catch (error) {
-            console.error(`❌ Error fetching ${feed.name}:`, error.message);
+    const allNews = [];
+    feedResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+            allNews.push(...result.value);
+            return;
         }
-    }
+
+        console.error(`❌ Error fetching ${FEEDS[index].name}:`, result.reason?.message || result.reason);
+    });
 
     // 重複を削除し、最新順にソート
     const uniqueNews = Array.from(new Map(allNews.map(item => [item.link, item])).values());

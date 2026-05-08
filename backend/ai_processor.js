@@ -7,6 +7,37 @@ dotenv.config();
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+function normalizeIndex(value) {
+  const index = typeof value === 'number' ? value : Number.parseInt(value, 10);
+  return Number.isInteger(index) ? index : null;
+}
+
+function sanitizeIndexList(indices, maxExclusive) {
+  if (!Array.isArray(indices)) return [];
+
+  return [...new Set(
+    indices
+      .map(normalizeIndex)
+      .filter(index => index !== null && index >= 0 && index < maxExclusive)
+  )];
+}
+
+function sanitizeCategorizedItems(items, itemsToProcess) {
+  if (!Array.isArray(items)) return [];
+
+  const seen = new Set();
+
+  return items.filter(item => {
+    const index = normalizeIndex(item?.id);
+    if (index === null || index < 0 || index >= itemsToProcess.length || seen.has(index)) {
+      return false;
+    }
+
+    seen.add(index);
+    return true;
+  });
+}
+
 export async function processNewsWithAI(newsItems) {
   if (!process.env.GEMINI_API_KEY) {
     console.error('❌ GEMINI_API_KEY is not set in .env file.');
@@ -132,23 +163,37 @@ ${newsListString}
     if (!step1Result) throw new Error('Step 1 AI processing failed');
 
     const { data: step1Data, modelName: usedModel } = step1Result;
-    console.log(`✅ Step 1 complete using ${usedModel}. Selected ${step1Data.headlines.length} headlines and ${step1Data.subNews.length} subNews.`);
+    const sanitizedHeadlines = sanitizeCategorizedItems(step1Data.headlines, itemsToProcess);
+    const sanitizedSubNews = sanitizeCategorizedItems(step1Data.subNews, itemsToProcess);
+    const usedIndices = new Set([
+      ...sanitizedHeadlines.map(item => normalizeIndex(item.id)),
+      ...sanitizedSubNews.map(item => normalizeIndex(item.id)),
+    ]);
+    const remainingIndices = sanitizeIndexList(step1Data.remainingIndices, itemsToProcess.length)
+      .filter(index => !usedIndices.has(index));
+
+    console.log(`✅ Step 1 complete using ${usedModel}. Selected ${sanitizedHeadlines.length} headlines and ${sanitizedSubNews.length} subNews.`);
 
     // --- STEP 2: Process Remaining News ---
     let otherNewsResults = [];
-    const remainingIndices = step1Data.remainingIndices || [];
 
     if (remainingIndices.length > 0) {
       // 残りが多い場合はさらに分割して処理
       const batchSize = 20;
       for (let i = 0; i < remainingIndices.length; i += batchSize) {
         const batchIndices = remainingIndices.slice(i, i + batchSize);
-        const batchListString = batchIndices.map(idx => {
+        const validBatchIndices = batchIndices.filter(idx => itemsToProcess[idx]);
+
+        if (validBatchIndices.length === 0) {
+          continue;
+        }
+
+        const batchListString = validBatchIndices.map(idx => {
           const item = itemsToProcess[idx];
           return `[${idx}] ${item.title} (Source: ${item.source})\nSnippet: ${item.contentSnippet}\n`;
         }).join('\n---\n');
 
-        console.log(`🤖 Processing Batch ${Math.floor(i / batchSize) + 1} of remaining news (${batchIndices.length} items)...`);
+        console.log(`🤖 Processing Batch ${Math.floor(i / batchSize) + 1} of remaining news (${validBatchIndices.length} items)...`);
         
         const step2Prompt = `
 以下のニュース記事リストを「その他のニュース（otherNews）」として、それぞれ150文字程度の日本語で詳しく要約してください。
@@ -163,16 +208,19 @@ ${newsListString}
 ${batchListString}
 `;
         const step2Result = await tryWithModels(step2Prompt);
-        if (step2Result) {
-          otherNewsResults = otherNewsResults.concat(step2Result.data.otherNews);
+        if (step2Result?.data?.otherNews) {
+          otherNewsResults = otherNewsResults.concat(
+            sanitizeCategorizedItems(step2Result.data.otherNews, itemsToProcess)
+              .filter(item => validBatchIndices.includes(normalizeIndex(item.id)))
+          );
         }
       }
     }
 
     // --- Data Reconstruction & MetaData Recovery ---
     const processedData = {
-      headlines: step1Data.headlines,
-      subNews: step1Data.subNews,
+      headlines: sanitizedHeadlines,
+      subNews: sanitizedSubNews,
       otherNews: otherNewsResults,
       generatedAt: new Date().toISOString(),
       aiModelUsed: usedModel
