@@ -10,7 +10,7 @@ on:
 
 # GitHub Pagesデプロイに必要な権限を付与
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -57,3 +57,19 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # GitHubは「60日間リポジトリに活動がない」とscheduleトリガーを自動停止する。
+      # 実際に2026-07-07を最後に配信が止まったため、定期的に空コミットを打って活動を維持する。
+      - name: Keep schedule trigger alive
+        run: |
+          LAST_COMMIT_TS=$(git log -1 --format=%ct)
+          AGE_DAYS=$(( ( $(date +%s) - LAST_COMMIT_TS ) / 86400 ))
+          echo "Days since last commit: ${AGE_DAYS}"
+          if [ "${AGE_DAYS}" -ge 45 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive to prevent schedule deactivation"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "Repository is still active. Skipping keepalive commit."
+          fi
